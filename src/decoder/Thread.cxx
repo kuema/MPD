@@ -279,17 +279,19 @@ decoder_run_stream_fallback(DecoderBridge &bridge, InputStream &is,
 static void
 LoadReplayGain(DecoderClient &client, InputStream &is)
 {
-	ReplayGainInfo info = ReplayGainInfo::Undefined();
+#ifdef ENABLE_SQLITE
+	ReplayGainInfo external_info = ReplayGainInfo::Undefined();
 
-	if (replay_gain_ape_read(is, info)) {
-		client.SubmitReplayGain(&info);
+	if (replay_gain_external_read(is, external_info)) {
+		client.SubmitReplayGain(&external_info);
 		return;
 	}
-
-#ifdef ENABLE_SQLITE
-	if (replay_gain_external_read(is, info))
-		client.SubmitReplayGain(&info);
 #endif
+
+	ReplayGainInfo tag_info = ReplayGainInfo::Undefined();
+
+	if (replay_gain_ape_read(is, tag_info))
+		client.SubmitReplayGain(&tag_info);
 }
 
 /**
