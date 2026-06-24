@@ -16,6 +16,46 @@ static constexpr Domain external_replay_gain_domain("external_replaygain");
 
 static std::string replay_gain_external_db_path;
 
+static constexpr char replay_gain_schema_sql[] =
+	"CREATE TABLE IF NOT EXISTS replaygain ("
+	"uri TEXT PRIMARY KEY,"
+	"size INTEGER,"
+	"mtime INTEGER,"
+	"track_gain REAL,"
+	"track_peak REAL,"
+	"album_gain REAL,"
+	"album_peak REAL,"
+	"scanner TEXT,"
+	"scanned_at INTEGER NOT NULL DEFAULT (unixepoch())"
+	")";
+
+static bool
+InitializeDatabase(const char *path) noexcept
+{
+	SqliteDb db;
+
+	if (sqlite3_open_v2(path, &db.db,
+			    SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_NOMUTEX,
+			    nullptr) != SQLITE_OK) {
+		FmtWarning(external_replay_gain_domain,
+			   "external ReplayGain database init failed: {}: {}",
+			   path, SqliteError(db.db));
+		return false;
+	}
+
+	char *error = nullptr;
+	if (sqlite3_exec(db.db, replay_gain_schema_sql, nullptr, nullptr, &error) != SQLITE_OK) {
+		FmtWarning(external_replay_gain_domain,
+			   "external ReplayGain schema init failed: {}: {}",
+			   path, error != nullptr ? error : SqliteError(db.db));
+
+		sqlite3_free(error);
+		return false;
+	}
+
+	return true;
+}
+
 void
 replay_gain_external_init(const ConfigData &config)
 {
@@ -24,13 +64,20 @@ replay_gain_external_init(const ConfigData &config)
 	if (path.IsNull()) {
 		replay_gain_external_db_path.clear();
 		LogNotice(external_replay_gain_domain,
-			 "external ReplayGain database disabled");
-	} else {
-		replay_gain_external_db_path = path.c_str();
-		FmtNotice(external_replay_gain_domain,
-			 "external ReplayGain database configured: {}",
-			 replay_gain_external_db_path);
+			  "external ReplayGain database disabled");
+		return;
 	}
+
+	replay_gain_external_db_path = path.c_str();
+
+	if (InitializeDatabase(replay_gain_external_db_path.c_str()))
+		FmtNotice(external_replay_gain_domain,
+			  "external ReplayGain database configured: {}",
+			  replay_gain_external_db_path);
+	else
+		FmtWarning(external_replay_gain_domain,
+			   "external ReplayGain database configured but not initialized: {}",
+			   replay_gain_external_db_path);
 }
 
 struct SqliteDb {
