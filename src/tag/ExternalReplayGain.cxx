@@ -1,14 +1,18 @@
 #include "config.h"
 #include "ExternalReplayGain.hxx"
 
+#include "Log.hxx"
 #include "config/Data.hxx"
 #include "config/Option.hxx"
 #include "fs/AllocatedPath.hxx"
 #include "input/InputStream.hxx"
+#include "util/Domain.hxx"
 
 #include <sqlite3.h>
 
 #include <string>
+
+static constexpr Domain external_replay_gain_domain("external_replaygain");
 
 static std::string replay_gain_external_db_path;
 
@@ -17,10 +21,16 @@ replay_gain_external_init(const ConfigData &config)
 {
 	const auto path = config.GetPath(ConfigOption::REPLAYGAIN_EXTERNAL_DB);
 
-	if (path.IsNull())
+	if (path.IsNull()) {
 		replay_gain_external_db_path.clear();
-	else
+		LogDebug(external_replay_gain_domain,
+			 "external ReplayGain database disabled");
+	} else {
 		replay_gain_external_db_path = path.c_str();
+		FmtDebug(external_replay_gain_domain,
+			 "external ReplayGain database configured: {}",
+			 replay_gain_external_db_path);
+	}
 }
 
 struct SqliteDb {
@@ -41,6 +51,14 @@ struct SqliteStmt {
 	}
 };
 
+static const char *
+SqliteError(sqlite3 *db) noexcept
+{
+	return db != nullptr
+		? sqlite3_errmsg(db)
+		: "unknown SQLite error";
+}
+
 static bool
 ColumnIsNull(sqlite3_stmt *stmt, int column) noexcept
 {
@@ -60,14 +78,25 @@ replay_gain_external_read(InputStream &is, ReplayGainInfo &info) noexcept
 		return false;
 
 	const char *const uri = is.GetURI();
-	if (uri == nullptr || *uri == 0)
+	if (uri == nullptr || *uri == 0) {
+		LogDebug(external_replay_gain_domain,
+			 "external ReplayGain lookup skipped: empty URI");
 		return false;
+	}
+
+	FmtDebug(external_replay_gain_domain,
+		 "external ReplayGain lookup: {}", uri);
 
 	SqliteDb db;
 	if (sqlite3_open_v2(replay_gain_external_db_path.c_str(), &db.db,
 			    SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX,
-			    nullptr) != SQLITE_OK)
+			    nullptr) != SQLITE_OK) {
+		FmtDebug(external_replay_gain_domain,
+			 "external ReplayGain database open failed: {}: {}",
+			 replay_gain_external_db_path,
+			 SqliteError(db.db));
 		return false;
+	}
 
 	static constexpr char sql[] =
 		"SELECT track_gain, track_peak, album_gain, album_peak "
@@ -75,14 +104,32 @@ replay_gain_external_read(InputStream &is, ReplayGainInfo &info) noexcept
 		"WHERE uri = ?1";
 
 	SqliteStmt stmt;
-	if (sqlite3_prepare_v2(db.db, sql, -1, &stmt.stmt, nullptr) != SQLITE_OK)
+	if (sqlite3_prepare_v2(db.db, sql, -1, &stmt.stmt, nullptr) != SQLITE_OK) {
+		FmtDebug(external_replay_gain_domain,
+			 "external ReplayGain query prepare failed: {}",
+			 SqliteError(db.db));
 		return false;
+	}
 
-	if (sqlite3_bind_text(stmt.stmt, 1, uri, -1, SQLITE_TRANSIENT) != SQLITE_OK)
+	if (sqlite3_bind_text(stmt.stmt, 1, uri, -1, SQLITE_TRANSIENT) != SQLITE_OK) {
+		FmtDebug(external_replay_gain_domain,
+			 "external ReplayGain query bind failed: {}",
+			 SqliteError(db.db));
 		return false;
+	}
 
-	if (sqlite3_step(stmt.stmt) != SQLITE_ROW)
+	const int step_result = sqlite3_step(stmt.stmt);
+	if (step_result != SQLITE_ROW) {
+		if (step_result == SQLITE_DONE)
+			FmtDebug(external_replay_gain_domain,
+				 "external ReplayGain miss: {}", uri);
+		else
+			FmtDebug(external_replay_gain_domain,
+				 "external ReplayGain query failed: {}: {}",
+				 uri, SqliteError(db.db));
+
 		return false;
+	}
 
 	info = ReplayGainInfo::Undefined();
 
@@ -100,5 +147,20 @@ replay_gain_external_read(InputStream &is, ReplayGainInfo &info) noexcept
 			: ColumnFloat(stmt.stmt, 3);
 	}
 
-	return info.IsDefined();
+	if (!info.IsDefined()) {
+		FmtDebug(external_replay_gain_domain,
+			 "external ReplayGain row ignored without gain values: {}",
+			 uri);
+		return false;
+	}
+
+	FmtDebug(external_replay_gain_domain,
+		 "external ReplayGain hit: {}: track_gain={} track_peak={} album_gain={} album_peak={}",
+		 uri,
+		 info.track.gain,
+		 info.track.peak,
+		 info.album.gain,
+		 info.album.peak);
+
+	return true;
 }
