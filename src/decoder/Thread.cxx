@@ -26,6 +26,10 @@
 #include "tag/ApeReplayGain.hxx"
 #include "Log.hxx"
 
+#ifdef ENABLE_SQLITE
+#include "tag/ExternalReplayGain.hxx"
+#endif
+
 #include <stdexcept>
 #include <functional>
 #include <memory>
@@ -275,9 +279,17 @@ decoder_run_stream_fallback(DecoderBridge &bridge, InputStream &is,
 static void
 LoadReplayGain(DecoderClient &client, InputStream &is)
 {
-	ReplayGainInfo info;
-	if (replay_gain_ape_read(is, info))
+	ReplayGainInfo info = ReplayGainInfo::Undefined();
+
+	if (replay_gain_ape_read(is, info)) {
 		client.SubmitReplayGain(&info);
+		return;
+	}
+
+#ifdef ENABLE_SQLITE
+	if (replay_gain_external_read(is, info))
+		client.SubmitReplayGain(&info);
+#endif
 }
 
 /**

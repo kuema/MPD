@@ -70,6 +70,7 @@
 #endif
 
 #ifdef ENABLE_SQLITE
+#include "tag/ExternalReplayGain.hxx"
 #include "sticker/Database.hxx"
 #endif
 
@@ -331,6 +332,10 @@ MainConfigured(const CommandLineOptions &options,
 #endif
 
 	TagLoadConfig(raw_config);
+
+#ifdef ENABLE_SQLITE
+	replay_gain_external_init(raw_config);
+#endif
 
 	log_init(raw_config, options.verbose, options.log_stderr);
 

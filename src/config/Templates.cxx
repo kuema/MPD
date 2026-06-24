@@ -37,6 +37,7 @@ const ConfigTemplate config_param_templates[] = {
 	{ "replaygain_preamp" },
 	{ "replaygain_missing_preamp" },
 	{ "replaygain_limit" },
+	{ "replaygain_external_db" },
 	{ "volume_normalization" },
 	{ "samplerate_converter" },
 	{ "audio_buffer_size" },

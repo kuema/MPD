@@ -548,6 +548,7 @@ endif
 
 if sqlite_dep.found()
   sources += [
+    'src/tag/ExternalReplayGain.cxx',
     'src/command/StickerCommands.cxx',
     'src/sticker/Database.cxx',
     'src/sticker/Print.cxx',
