@@ -23,11 +23,11 @@ replay_gain_external_init(const ConfigData &config)
 
 	if (path.IsNull()) {
 		replay_gain_external_db_path.clear();
-		LogDebug(external_replay_gain_domain,
+		LogNotice(external_replay_gain_domain,
 			 "external ReplayGain database disabled");
 	} else {
 		replay_gain_external_db_path = path.c_str();
-		FmtDebug(external_replay_gain_domain,
+		FmtNotice(external_replay_gain_domain,
 			 "external ReplayGain database configured: {}",
 			 replay_gain_external_db_path);
 	}
@@ -91,7 +91,7 @@ replay_gain_external_read(InputStream &is, ReplayGainInfo &info) noexcept
 	if (sqlite3_open_v2(replay_gain_external_db_path.c_str(), &db.db,
 			    SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX,
 			    nullptr) != SQLITE_OK) {
-		FmtDebug(external_replay_gain_domain,
+		FmtWarning(external_replay_gain_domain,
 			 "external ReplayGain database open failed: {}: {}",
 			 replay_gain_external_db_path,
 			 SqliteError(db.db));
@@ -105,14 +105,14 @@ replay_gain_external_read(InputStream &is, ReplayGainInfo &info) noexcept
 
 	SqliteStmt stmt;
 	if (sqlite3_prepare_v2(db.db, sql, -1, &stmt.stmt, nullptr) != SQLITE_OK) {
-		FmtDebug(external_replay_gain_domain,
+		FmtWarning(external_replay_gain_domain,
 			 "external ReplayGain query prepare failed: {}",
 			 SqliteError(db.db));
 		return false;
 	}
 
 	if (sqlite3_bind_text(stmt.stmt, 1, uri, -1, SQLITE_TRANSIENT) != SQLITE_OK) {
-		FmtDebug(external_replay_gain_domain,
+		FmtWarning(external_replay_gain_domain,
 			 "external ReplayGain query bind failed: {}",
 			 SqliteError(db.db));
 		return false;
@@ -121,10 +121,10 @@ replay_gain_external_read(InputStream &is, ReplayGainInfo &info) noexcept
 	const int step_result = sqlite3_step(stmt.stmt);
 	if (step_result != SQLITE_ROW) {
 		if (step_result == SQLITE_DONE)
-			FmtDebug(external_replay_gain_domain,
+			FmtInfo(external_replay_gain_domain,
 				 "external ReplayGain miss: {}", uri);
 		else
-			FmtDebug(external_replay_gain_domain,
+			FmtWarning(external_replay_gain_domain,
 				 "external ReplayGain query failed: {}: {}",
 				 uri, SqliteError(db.db));
 
@@ -154,7 +154,7 @@ replay_gain_external_read(InputStream &is, ReplayGainInfo &info) noexcept
 		return false;
 	}
 
-	FmtDebug(external_replay_gain_domain,
+	FmtInfo(external_replay_gain_domain,
 		 "external ReplayGain hit: {}: track_gain={} track_peak={} album_gain={} album_peak={}",
 		 uri,
 		 info.track.gain,
