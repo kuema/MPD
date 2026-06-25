@@ -272,6 +272,28 @@ decoder_run_stream_fallback(DecoderBridge &bridge, InputStream &is,
 	return decoder_stream_decode(*plugin, bridge, is, lock);
 }
 
+#ifdef ENABLE_SQLITE
+static bool
+MaybeLoadExternalReplayGain(DecoderBridge &bridge)
+{
+	if (bridge.dc.song == nullptr || !bridge.dc.song->IsFile())
+		return false;
+
+	const char *const uri = bridge.dc.song->GetURI();
+
+	if (uri == nullptr || *uri == 0)
+		return false;
+
+	ReplayGainInfo info = ReplayGainInfo::Undefined();
+
+	if (!replay_gain_external_read(uri, info))
+		return false;
+
+	bridge.SubmitReplayGain(&info);
+	return true;
+}
+#endif
+
 /**
  * Attempt to load replay gain data, and pass it to
  * DecoderClient::SubmitReplayGain().
@@ -279,19 +301,9 @@ decoder_run_stream_fallback(DecoderBridge &bridge, InputStream &is,
 static void
 LoadReplayGain(DecoderClient &client, InputStream &is)
 {
-#ifdef ENABLE_SQLITE
-	ReplayGainInfo external_info = ReplayGainInfo::Undefined();
-
-	if (replay_gain_external_read(is, external_info)) {
-		client.SubmitReplayGain(&external_info);
-		return;
-	}
-#endif
-
-	ReplayGainInfo tag_info = ReplayGainInfo::Undefined();
-
-	if (replay_gain_ape_read(is, tag_info))
-		client.SubmitReplayGain(&tag_info);
+	ReplayGainInfo info;
+	if (replay_gain_ape_read(is, info))
+		client.SubmitReplayGain(&info);
 }
 
 /**
@@ -311,6 +323,11 @@ MaybeLoadReplayGain(DecoderBridge &bridge, InputStream &is)
 		   cdio_paranoia input plugin) which cannot possibly
 		   contain tags */
 		return;
+
+#ifdef ENABLE_SQLITE
+	if (MaybeLoadExternalReplayGain(bridge))
+		return;
+#endif
 
 	LoadReplayGain(bridge, is);
 }

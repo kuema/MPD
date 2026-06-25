@@ -5,7 +5,7 @@
 #include "config/Data.hxx"
 #include "config/Option.hxx"
 #include "fs/AllocatedPath.hxx"
-#include "input/InputStream.hxx"
+#include <string_view>
 #include "util/Domain.hxx"
 
 #include <sqlite3.h>
@@ -119,13 +119,12 @@ ColumnFloat(sqlite3_stmt *stmt, int column) noexcept
 }
 
 bool
-replay_gain_external_read(InputStream &is, ReplayGainInfo &info) noexcept
+replay_gain_external_read(std::string_view uri, ReplayGainInfo &info) noexcept
 {
 	if (replay_gain_external_db_path.empty())
 		return false;
 
-	const char *const uri = is.GetURI();
-	if (uri == nullptr || *uri == 0) {
+	if (uri.empty()) {
 		LogDebug(external_replay_gain_domain,
 			 "external ReplayGain lookup skipped: empty URI");
 		return false;
@@ -158,7 +157,9 @@ replay_gain_external_read(InputStream &is, ReplayGainInfo &info) noexcept
 		return false;
 	}
 
-	if (sqlite3_bind_text(stmt.stmt, 1, uri, -1, SQLITE_TRANSIENT) != SQLITE_OK) {
+	if (sqlite3_bind_text(stmt.stmt, 1, uri.data(),
+		      static_cast<int>(uri.size()),
+		      SQLITE_TRANSIENT) != SQLITE_OK) {
 		FmtWarning(external_replay_gain_domain,
 			 "external ReplayGain query bind failed: {}",
 			 SqliteError(db.db));
