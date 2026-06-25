@@ -29,6 +29,32 @@ static constexpr char replay_gain_schema_sql[] =
 	"scanned_at INTEGER NOT NULL DEFAULT (unixepoch())"
 	")";
 
+struct SqliteDb {
+	sqlite3 *db = nullptr;
+
+	~SqliteDb() noexcept {
+		if (db != nullptr)
+			sqlite3_close(db);
+	}
+};
+
+struct SqliteStmt {
+	sqlite3_stmt *stmt = nullptr;
+
+	~SqliteStmt() noexcept {
+		if (stmt != nullptr)
+			sqlite3_finalize(stmt);
+	}
+};
+
+static const char *
+SqliteError(sqlite3 *db) noexcept
+{
+	return db != nullptr
+		? sqlite3_errmsg(db)
+		: "unknown SQLite error";
+}
+
 static bool
 InitializeDatabase(const char *path) noexcept
 {
@@ -78,32 +104,6 @@ replay_gain_external_init(const ConfigData &config)
 		FmtWarning(external_replay_gain_domain,
 			   "external ReplayGain database configured but not initialized: {}",
 			   replay_gain_external_db_path);
-}
-
-struct SqliteDb {
-	sqlite3 *db = nullptr;
-
-	~SqliteDb() noexcept {
-		if (db != nullptr)
-			sqlite3_close(db);
-	}
-};
-
-struct SqliteStmt {
-	sqlite3_stmt *stmt = nullptr;
-
-	~SqliteStmt() noexcept {
-		if (stmt != nullptr)
-			sqlite3_finalize(stmt);
-	}
-};
-
-static const char *
-SqliteError(sqlite3 *db) noexcept
-{
-	return db != nullptr
-		? sqlite3_errmsg(db)
-		: "unknown SQLite error";
 }
 
 static bool
