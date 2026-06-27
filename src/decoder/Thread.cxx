@@ -274,8 +274,11 @@ decoder_run_stream_fallback(DecoderBridge &bridge, InputStream &is,
 
 #ifdef ENABLE_SQLITE
 static bool
-MaybeLoadExternalReplayGain(DecoderBridge &bridge)
+MaybeHandleExternalReplayGain(DecoderBridge &bridge)
 {
+	if (!replay_gain_external_enabled())
+		return false;
+
 	if (bridge.dc.song == nullptr || !bridge.dc.song->IsFile())
 		return false;
 
@@ -286,10 +289,17 @@ MaybeLoadExternalReplayGain(DecoderBridge &bridge)
 
 	ReplayGainInfo info = ReplayGainInfo::Undefined();
 
-	if (!replay_gain_external_read(uri, info))
-		return false;
+	if (replay_gain_external_read(uri, info)) {
+		bridge.SubmitReplayGain(&info);
+		bridge.LockReplayGain();
+		return true;
+	}
 
-	bridge.SubmitReplayGain(&info);
+	/*
+	 * The external ReplayGain database is configured and therefore
+	 * authoritative for local files.  A miss means "no ReplayGain",
+	 * not "fall back to decoder/plugin ReplayGain".
+	 */
 	bridge.LockReplayGain();
 	return true;
 }
@@ -326,7 +336,7 @@ MaybeLoadReplayGain(DecoderBridge &bridge, InputStream &is)
 		return;
 
 #ifdef ENABLE_SQLITE
-	if (MaybeLoadExternalReplayGain(bridge))
+	if (MaybeHandleExternalReplayGain(bridge))
 		return;
 #endif
 
