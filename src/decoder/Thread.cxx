@@ -290,6 +290,7 @@ MaybeLoadExternalReplayGain(DecoderBridge &bridge)
 		return false;
 
 	bridge.SubmitReplayGain(&info);
+	bridge.LockReplayGain();
 	return true;
 }
 #endif
