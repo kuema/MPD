@@ -26,7 +26,17 @@ static constexpr char replay_gain_schema_sql[] =
 	"album_gain REAL,"
 	"album_peak REAL,"
 	"scanner TEXT,"
-	"scanned_at INTEGER NOT NULL DEFAULT (unixepoch())"
+	"scanner_version TEXT,"
+	"scanned_at INTEGER NOT NULL DEFAULT (unixepoch()),"
+	"target_lufs REAL,"
+	"track_loudness_lufs REAL,"
+	"track_peak_db REAL,"
+	"track_peak_type TEXT,"
+	"track_clipping_adjustment INTEGER,"
+	"album_loudness_lufs REAL,"
+	"album_peak_db REAL,"
+	"album_peak_type TEXT,"
+	"album_clipping_adjustment INTEGER"
 	")";
 
 struct SqliteDb {
