@@ -89,6 +89,12 @@ private:
 	ReplayGainInfo replay_gain_info;
 
 	/**
+	 * External ReplayGain data has been accepted for this decoder run.
+	 * Ignore later ReplayGain submissions from decoder plugins.
+	 */
+	bool replay_gain_locked = false;
+
+	/**
 	 * A positive serial number for checking if replay gain info
 	 * has changed since the last check.
 	 */
@@ -167,6 +173,9 @@ public:
 				   uint16_t kbit_rate) noexcept override;
 	DecoderCommand SubmitTag(InputStream *is, Tag &&tag) noexcept override;
 	void SubmitReplayGain(const ReplayGainInfo *replay_gain_info) noexcept override;
+	void LockReplayGain() noexcept {
+		replay_gain_locked = true;
+	}
 	void SubmitMixRamp(MixRampInfo &&mix_ramp) noexcept override;
 
 private:

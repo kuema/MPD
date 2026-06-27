@@ -129,6 +129,12 @@ ColumnFloat(sqlite3_stmt *stmt, int column) noexcept
 }
 
 bool
+replay_gain_external_enabled() noexcept
+{
+	return !replay_gain_external_db_path.empty();
+}
+
+bool
 replay_gain_external_read(std::string_view uri, ReplayGainInfo &info) noexcept
 {
 	if (replay_gain_external_db_path.empty())

@@ -592,6 +592,14 @@ DecoderBridge::SubmitTag(InputStream *is, Tag &&tag) noexcept
 void
 DecoderBridge::SubmitReplayGain(const ReplayGainInfo *new_replay_gain_info) noexcept
 {
+	if (replay_gain_locked){
+		if (new_replay_gain_info != nullptr) {
+			FmtDebug(decoder_domain,
+                 "RG submit ignored: external ReplayGain is authoritative");
+		}
+		return;
+	}
+
 	if (new_replay_gain_info != nullptr) {
 		static unsigned serial;
 		if (++serial == 0)
